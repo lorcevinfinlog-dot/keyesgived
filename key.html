@@ -1,30 +1,856 @@
+--[[
+    Misty Dany Hub — NEON BLUE + 48h Key System + VIP (Adaptive)
+    Works on PC & Mobile. VIP Key bypasses the 48h timer.
+]]
 
-local __D = function(s, k)
-    local b = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-    local r = {} 
-    s = s:gsub("[^" .. b .. "=]", "")
-    local function d(c) local v = b:find(c, 1, true) return v and v - 1 or 0 end
-    for i = 1, #s, 4 do
-        local c1, c2, c3, c4 = s:sub(i, i+3):byte(1, 4)
-        local b1, b2, b3, b4 = d(string.char(c1)), d(string.char(c2)), d(string.char(c3)), d(string.char(c4))
-        local n = b1 * 262144 + b2 * 4096 + b3 * 64 + b4
-        r[#r+1] = string.char(math.floor(n / 65536) % 256)
-        if c3 ~= 61 then r[#r+1] = string.char(math.floor(n / 256) % 256) end
-        if c4 ~= 61 then r[#r+1] = string.char(n % 256) end
-    end
-    local o = table.concat(r)
-    local x = ""
-    for i = 1, #o do x = x .. string.char(bit32.bxor(string.byte(o, i), k)) end
-    return x
+local Players          = game:GetService("Players")
+local TweenService     = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local Lighting         = game:GetService("Lighting")
+local CoreGui          = game:GetService("CoreGui")
+
+-- ============================================================
+--  ⚙️ НАСТРОЙКИ КЛЮЧА
+-- ============================================================
+local KEY_CONFIG = {
+    KEY_PAGE_URL  = "https://lorcevinfinlog-dot.github.io/keyesgived/key.html",
+    GetKeyURL     = "https://lootdest.org/s?BSEkyrKI",
+    SaveFile      = "MistyDany_key.txt",
+    DurationHours = 48,  -- ⏱ срок действия обычного ключа
+    
+    -- 💎 VIP-КЛЮЧИ
+    VIPKeys = {
+        ["MistyX3DX2D-zx1x2ddjk"] = true, 
+    },
+}
+
+local KEY_DURATION = (KEY_CONFIG.DurationHours or 48) * 3600
+
+-- ============================================================
+--  📜 ДОБАВЛЕНИЕ НОВЫХ СКРИПТОВ (СЮДА)
+-- ============================================================
+local CONFIG = {
+    Title    = "MISTY DANY",
+    Subtitle = "Blood Zone • Version Selector",
+    Versions = {
+        { label = "Version 1",        sub = "Classic interface • Legacy build",  tag = "LEGACY", accent = Color3.fromRGB(110, 170, 230),
+          url = "https://raw.githubusercontent.com/lorcevinfinlog-dot/Project_Misty/refs/heads/main/The%20Blood%20Zone/Misty_Dany%20Hub-Blood%20Zone%20V1.txt" },
+        { label = "Version 2",        sub = "Classic interface • Improved",       tag = "LEGACY", accent = Color3.fromRGB(110, 170, 230),
+          url = "https://raw.githubusercontent.com/lorcevinfinlog-dot/Project_Misty/refs/heads/main/The%20Blood%20Zone/Misty_Dany%20Hub-Blood%20Zone%20V2.txt" },
+        { label = "Version 8",        sub = "New GUI • Most stable build",        tag = "STABLE", accent = Color3.fromRGB(0, 190, 255),
+          url = "https://raw.githubusercontent.com/lorcevinfinlog-dot/Project_Misty/refs/heads/main/The%20Blood%20Zone/Misty_Dany%20Hub-Blood%20Zone%20V8.txt" },
+        { label = "Version 8 Mobile", sub = "New GUI • Optimized for phones",    tag = "MOBILE", accent = Color3.fromRGB(70, 230, 255),
+          url = "https://raw.githubusercontent.com/lorcevinfinlog-dot/Project_Misty/refs/heads/main/The%20Blood%20Zone/Misty_Dany%20Hub-Blood%20Zone%20Phone%20V8.txt" },
+        { label = "Version 9",        sub = "New GUI • Latest release",           tag = "NEW",    accent = Color3.fromRGB(120, 140, 255),
+          url = "https://raw.githubusercontent.com/lorcevinfinlog-dot/Project_Misty/refs/heads/main/The%20Blood%20Zone/Misty_Dany%20Hub-Blood%20Zone%20Phone%20V8.txt" },
+    },
+}
+
+-- ============================================================
+--  ЦВЕТА (NEON BLUE)
+-- ============================================================
+local C = {
+    bg1        = Color3.fromRGB(8, 16, 34),
+    bg2        = Color3.fromRGB(2, 8, 22),
+    card       = Color3.fromRGB(12, 26, 52),
+    cardHover  = Color3.fromRGB(20, 44, 88),
+    cardActive = Color3.fromRGB(28, 60, 116),
+    stroke     = Color3.fromRGB(30, 90, 180),
+    neon       = Color3.fromRGB(0, 190, 255),
+    neonSoft   = Color3.fromRGB(120, 220, 255),
+    textName   = Color3.fromRGB(230, 245, 255),
+    textDesc   = Color3.fromRGB(120, 170, 220),
+    footer     = Color3.fromRGB(80, 130, 190),
+    overlay    = Color3.fromRGB(0, 6, 18),
+    red        = Color3.fromRGB(255, 80, 110),
+    green      = Color3.fromRGB(60, 240, 160),
+    warn       = Color3.fromRGB(255, 200, 90),
+    vip        = Color3.fromRGB(255, 215, 0),
+}
+
+-- ============================================================
+--  ОЧИСТКА СТАРОГО GUI
+-- ============================================================
+pcall(function()
+    local old = CoreGui:FindFirstChild("MistyDanySelector")
+    if old then old:Destroy() end
+    local pg = Players.LocalPlayer:FindFirstChild("PlayerGui")
+    local old2 = pg and pg:FindFirstChild("MistyDanySelector")
+    if old2 then old2:Destroy() end
+end)
+
+-- ============================================================
+--  ЛОГИКА КЛЮЧЕЙ
+-- ============================================================
+local function normalize(k)
+    if not k then return "" end
+    return (k:gsub("%s+", ""))
 end
 
-local __sd9dc9f = 0
-while true do
-    if __sd9dc9f == 0 then
-        local Players=game:GetService(__D("jLC9pbmurw==",220))local TweenService=game:GetService(__D("xeb09P/C9OPn+PL0",145))local UserInputService=game:GetService(__D("vJqMm6CHmZyduoybn4CKjA==",233))local Lighting=game:GetService(__D("1PH/8Ozx9v8=",152))local CoreGui=game:GetService(__D("jqK/qIq4pA==",205))local KEY_CONFIG={KEY_PAGE_URL=__D("PCAgJCdue3s4OyY3MSI9OjI9Ojg7M3kwOyB6Mz0gPCE2ej07ez8xLTEnMz0iMTB7PzEtejwgOTg=",84),GetKeyURL=__D("5vr6/v20oaHi4eH66uv9+qDh/Omh/bHM3cvl9/zFxw==",142),SaveFile=__D("roqQl5qngo2avIiGms2Xm5c=",227),DurationHours=(84-36),VIPKeys={[__D("vZmDhImow7SowrTdiojBiMKUlJqb",240)]=true,},}local KEY_DURATION=(KEY_CONFIG.DurationHours or(33+15))*(4097-497)local CONFIG={Title=__D("EBQOCQR9GRwTBA==",93),Subtitle=__D("/NLR0dqe5NHQ255cPhye6NvMzdfR0J7t29Lb3crRzA==",190),Versions={{label=__D("aVpNTFZQUR8O",63),sub=__D("kr2woqK4svG4v6W0o7ewsrTxM1Fz8Z20trCyqPGzpLi9tQ==",209),tag=__D("TURGQEJY",1),accent=Color3.fromRGB((213-103),(154+16),(268-38)),url=__D("5fn5/f63oqL/7Pqj6uT55fjv+P7o/+7i4/no4/mj7uLgouHi/+7o++Tj6+Tj4eLqoOni+aLd/+Ln6O750sDk/vn0ov/o6/6i5ejs6f6i4Ozk46LZ5eiov73P4eLi6ai/vdfi4+iiwOT++fTSyezj9Ki/vcX476DP4eLi6ai/vdfi4+iov73bvKP59fk=",141)},{label=__D("1+Tz8uju76Gz",129),sub=__D("iKequLiiqOuipb+uua2qqK7rKUtp64Kmu7mkva6v",203),tag=__D("UVhaXF5E",29),accent=Color3.fromRGB((6+104),(14+156),(218+12)),url=__D("++fn4+CpvLzh8uS99Prn++bx5uD24fD8/ef2/ee98Pz+vP/84fD25fr99fr9//z0vvf857zD4fz59vDnzN764OfqvOH29eC8+/by9+C8/vL6/bzH+/a2oaPR//z897aho8n8/fa83vrg5+rM1/L96raho9vm8b7R//z897aho8n8/fa2oaPFob3n6+c=",147)},{label=__D("DD8oKTM1NHpi",90),sub=__D("9d7Mm/zu8ptZOxmb9tTIz5vIz9rZ196b2c7S198=",187),tag=__D("oaazsL63",242),accent=Color3.fromRGB(0,(231-41),(320-65)),url=__D("9urq7u2ksbHs/+mw+ffq9uv86+377P3x8Or78Oqw/fHzsfLx7P376Pfw+Pfw8vH5s/rx6rHO7PH0+/3qwdP37ernsez7+O2x9vv/+u2x8//38LHK9vu7rK7c8vHx+rusrsTx8Pux0/ft6ufB2v/w57usrtbr/LPc8vHx+rusrsTx8Pu7rK7IprDq5uo=",158)},{label=__D("8sHW183LyoSchOnLxs3IwQ==",164),sub=__D("YUpYD2h6Zg/Nr40PYF9bRkJGVUpLD0lAXQ9fR0BBSlw=",47),tag=__D("QkBNRkNK",15),accent=Color3.fromRGB((72-2),(86+144),(500-245)),url=__D("QV1dWVoTBgZbSF4HTkBdQVxLXFpMW0pGR11MR10HSkZEBkVGW0pMX0BHT0BHRUZOBE1GXQZ5W0ZDTEpddmRAWl1QBltMT1oGQUxITVoGREhARwZ9QUwMGxlrRUZGTQwbGXNGR0wGZEBaXVB2bUhHUAwbGWFcSwRrRUZGTQwbGXNGR0wMGxl5QUZHTAwbGX8RB11RXQ==",41)},{label=__D("5dbBwNrc3ZOK",179),sub=__D("4snbjOv55YxOLA6M4M3Yyd/YjN7JwMnN38k=",172),tag=__D("fnVn",48),accent=Color3.fromRGB((185-65),(99+41),(208+47)),url=__D("JDg4PD92Y2M+LTtiKyU4JDkuOT8pPi8jIjgpIjhiLyMhYyAjPi8pOiUiKiUiICMrYSgjOGMcPiMmKS84EwElPzg1Yz4pKj9jJCktKD9jIS0lImMYJClpfnwOICMjKGl+fBYjIiljASU/ODUTCC0iNWl+fAQ5LmEOICMjKGl+fBYjIilpfnwcJCMiKWl+fBp0Yjg0OA==",76)},},}local C={bg1=Color3.fromRGB((14-6),(14+2),(32+2)),bg2=Color3.fromRGB((2+0),(2+6),(16+6)),card=Color3.fromRGB((13-1),(26+0),(56-4)),cardHover=Color3.fromRGB((20+0),(9+35),(131-43)),cardActive=Color3.fromRGB((55-27),(55+5),(88+28)),stroke=Color3.fromRGB((49-19),(95-5),(231-51)),neon=Color3.fromRGB(0,(261-71),(403-148)),neonSoft=Color3.fromRGB((190-70),(331-111),(442-187)),textName=Color3.fromRGB((247-17),(148+97),(322-67)),textDesc=Color3.fromRGB((15+105),(334-164),(318-98)),footer=Color3.fromRGB((134-54),(138-8),(169+21)),overlay=Color3.fromRGB(0,(3+3),(6+12)),red=Color3.fromRGB((347-92),(27+53),(205-95)),green=Color3.fromRGB((107-47),(159+81),(207-47)),warn=Color3.fromRGB((90+165),(81+119),(140-50)),vip=Color3.fromRGB((82+173),(158+57),0),}pcall(function()local old=CoreGui:FindFirstChild(__D("FTErLCEcOTYhCz00PTssNyo=",88))if old then old:Destroy()end local pg=Players.LocalPlayer:FindFirstChild(__D("GiYrMy84DT8j",74))local old2=pg and pg:FindFirstChild(__D("4sbc29brzsHW/MrDyszbwN0=",175))if old2 then old2:Destroy()end end)local function normalize(k)if not k then return __D("",131)end return(k:gsub(__D("OG42",29),__D("",46)))end local function nowTs()return os.time()end local function formatDuration(sec)if not sec or sec<=0 then return __D("9qs=",198)end local h=math.floor(sec/(6436-2836))local m=math.floor((sec%(2786+814))/(37+23))if h>0 then return string.format(__D("+7q2/vu6sw==",222),h,m)end return string.format(__D("/by1",216),m)end local function saveKeyWithTime(key)if not writefile then return nowTs()end local ts=nowTs()pcall(function()writefile(KEY_CONFIG.SaveFile,key..__D("tw==",203)..tostring(ts))end)return ts end local function getSavedData()if not(isfile and readfile)then return nil,nil end local ok,data=pcall(function()if isfile(KEY_CONFIG.SaveFile)then return readfile(KEY_CONFIG.SaveFile)end end)if not ok or not data or data==__D("",114)then return nil,nil end local k,t=data:match(__D("fQsNDgpfCwZHCAoGUAkH",35))if k and t then return normalize(k),tonumber(t)end return normalize(data),0 end local function clearSavedKey()if not(isfile and delfile)then return end pcall(function()if isfile(KEY_CONFIG.SaveFile)then delfile(KEY_CONFIG.SaveFile)end end)end local function validateKey(key)key=normalize(key)if key==__D("",96)then return false end local lowerKey=string.lower(key)if lowerKey==__D("Iyc9Ojc2fSo2fCpjNDZ/NnwqKiQl",78)then return true end if KEY_CONFIG.VIPKeys[key]then return true end local ok,html=pcall(function()return game:HttpGet(KEY_CONFIG.KEY_PAGE_URL..__D("F1wV",40)..os.time(),true)end)if ok and html then local realKey=html:match(__D("Ym82KWBucik1IyUmIjc=",11))if realKey and normalize(realKey)==key then return true end end return false end local function checkSavedKey(key,savedTs)if not key or not savedTs or savedTs<=0 then return false,__D("Njd4KzkuPTx4Mz0h",88)end local lowerKey=string.lower(key)if lowerKey==__D("u7+loq+u5bKu5LL7rK7nruSysry9",214)or KEY_CONFIG.VIPKeys[key]then return true,__D("u6S9",205)end local elapsed=nowTs()-savedTs if elapsed<0 then elapsed=0 end if elapsed>=KEY_DURATION then return false,__D("WkdPVk1aWw==",63)end return true,__D("dH19d3J1fg==",27)end local cam=workspace.CurrentCamera local vp=cam.ViewportSize local isMobile=UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled local minSide=math.min(vp.X,vp.Y)local winW=math.clamp(math.floor(vp.X*0.90),(429-129),(1072-512))local winH=math.clamp(math.floor(vp.Y*0.82),(688-328),(883-363))local scale=math.clamp(minSide/(334+266),0.82,(2-1))local cardH=math.floor((56+22)*scale+(isMobile and(15-7)or 0))local titleSize=math.floor((58-24)*scale)local subtitleSize=math.floor((5+8)*scale)local nameSize=math.floor((32-13)*scale)local descSize=math.floor((5+8)*scale)local closeSize=isMobile and(61-17)or(9+27)local pad=isMobile and(6+12)or(12+4)local ScreenGui=Instance.new(__D("VmZ3YGBrQnBs",5))ScreenGui.Name=__D("JwMZHhMuCwQTOQ8GDwkeBRg=",106)ScreenGui.ResetOnSpawn=false ScreenGui.IgnoreGuiInset=true ScreenGui.DisplayOrder=999999 ScreenGui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling local okParent=pcall(function()ScreenGui.Parent=CoreGui end)if not okParent or not ScreenGui.Parent then ScreenGui.Parent=Players.LocalPlayer:WaitForChild(__D("rpKfh5uMuYuX",254))end local blur=Instance.new(__D("gqy1soWmpqWjtA==",192))blur.Size=0 blur.Parent=Lighting TweenService:Create(blur,TweenInfo.new(0.4),{Size=(20-4)}):Play()local Overlay=Instance.new(__D("rJiLh48=",234))Overlay.Size=UDim2.fromScale((1+0),(1+0))Overlay.BackgroundColor3=C.overlay Overlay.BackgroundTransparency=0.35 Overlay.BorderSizePixel=0 Overlay.Parent=ScreenGui local Main=Instance.new(__D("/8vY1Nw=",185))Main.AnchorPoint=Vector2.new(0.5,0.5)Main.Position=UDim2.fromScale(0.5,0.5)Main.Size=UDim2.fromOffset(0,0)Main.BackgroundColor3=C.bg1 Main.BorderSizePixel=0 Main.ClipsDescendants=false Main.Parent=ScreenGui local MainCorner=Instance.new(__D("lIiCrrOvpLM=",193));MainCorner.CornerRadius=UDim.new(0,(35-17));MainCorner.Parent=Main local MainStroke=Instance.new(__D("3MDa/fvm4uw=",137))MainStroke.Color=C.neon MainStroke.Thickness=(2+0)MainStroke.Transparency=0.25 MainStroke.Parent=Main local MainGrad=Instance.new(__D("Kzc5DB8aFxsQCg==",126))MainGrad.Color=ColorSequence.new{ColorSequenceKeypoint.new(0,C.bg1),ColorSequenceKeypoint.new((2-1),C.bg2)}MainGrad.Rotation=(55+35)MainGrad.Parent=Main TweenService:Create(Main,TweenInfo.new(0.45,Enum.EasingStyle.Back,Enum.EasingDirection.Out),{Size=UDim2.fromOffset(winW,winH)}):Play()local dragBar=Instance.new(__D("2+/88Pg=",157))dragBar.Size=UDim2.new((2-1),0,0,(85-13))dragBar.BackgroundTransparency=(2-1)dragBar.Parent=Main local dragging,dragInput,dragStart,startPos dragBar.InputBegan:Connect(function(input)if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.Touch then dragging=true dragStart=input.Position startPos=Main.Position input.Changed:Connect(function()if input.UserInputState==Enum.UserInputState.End then dragging=false end end)end end)dragBar.InputChanged:Connect(function(input)if input.UserInputType==Enum.UserInputType.MouseMovement or input.UserInputType==Enum.UserInputType.Touch then dragInput=input end end)UserInputService.InputChanged:Connect(function(input)if dragging and input==dragInput then local delta=input.Position-dragStart Main.Position=UDim2.new(startPos.X.Scale,startPos.X.Offset+delta.X,startPos.Y.Scale,startPos.Y.Offset+delta.Y)end end)local closed=false local function closeAll()if closed then return end closed=true TweenService:Create(Main,TweenInfo.new(0.22,Enum.EasingStyle.Quad,Enum.EasingDirection.In),{Size=UDim2.fromOffset(winW*0.7,winH*0.5),BackgroundTransparency=(1+0)}):Play()TweenService:Create(MainStroke,TweenInfo.new(0.22),{Transparency=(1+0)}):Play()TweenService:Create(Overlay,TweenInfo.new(0.22),{BackgroundTransparency=(1+0)}):Play()TweenService:Create(blur,TweenInfo.new(0.22),{Size=0}):Play()task.delay(0.28,function()blur:Destroy();ScreenGui:Destroy()end)end local function buildKeyScreen(onSuccess)local Header=Instance.new(__D("q5+MgIg=",237))Header.Size=UDim2.new((2-1),0,0,(83+7))Header.BackgroundTransparency=(2-1)Header.Parent=Main local Title=Instance.new(__D("YVBNQXlUV1BZ",53))Title.Text=__D("37C7vw9ubGxqfHwPZGp2",47)Title.Font=Enum.Font.GothamBlack Title.TextSize=math.floor((24+2)*scale)Title.TextColor3=Color3.fromRGB((479-224),(5+250),(30+225))Title.BackgroundTransparency=(1+0)Title.Position=UDim2.fromOffset(pad+(7+3),(14+6))Title.Size=UDim2.new((1+0),-(22+58),0,(26+4))Title.TextXAlignment=Enum.TextXAlignment.Left Title.Parent=Header local TG=Instance.new(__D("2cXL/u3o5eni+A==",140))TG.Color=ColorSequence.new{ColorSequenceKeypoint.new(0,Color3.fromRGB((125+65),(238-3),(438-183))),ColorSequenceKeypoint.new(0.5,C.neon),ColorSequenceKeypoint.new((2-1),Color3.fromRGB((8+62),(122-2),(384-129))),}TG.Parent=Title local SubTitle=Instance.new(__D("QHFsYFh1dnF4",20))SubTitle.Text=__D("/NfN3MuZwNbMy5nS3MCZWzktmc/Y1dDdmd/Wy5k=",185)..KEY_CONFIG.DurationHours..__D("7qahu7y9",206)SubTitle.Font=Enum.Font.Gotham SubTitle.TextSize=subtitleSize SubTitle.TextColor3=C.textDesc SubTitle.BackgroundTransparency=(2-1)SubTitle.Position=UDim2.fromOffset(pad+(15-3),(3+51))SubTitle.Size=UDim2.new((2-1),-(86-6),0,(7+13))SubTitle.TextXAlignment=Enum.TextXAlignment.Left SubTitle.Parent=Header local CloseBtn=Instance.new(__D("+MnU2O7Z2NjDwg==",172))CloseBtn.Size=UDim2.fromOffset(closeSize,closeSize)CloseBtn.Position=UDim2.new((1+0),-(closeSize+(10+4)),0,(2+18))CloseBtn.BackgroundColor3=Color3.fromRGB((10+0),(13+13),(21+31))CloseBtn.Text=__D("Hko=",221)CloseBtn.Font=Enum.Font.GothamBold CloseBtn.TextSize=math.floor((34-10)*scale)CloseBtn.TextColor3=C.neonSoft CloseBtn.AutoButtonColor=false CloseBtn.Parent=Header local c1=Instance.new(__D("SlZccG1xem0=",31));c1.CornerRadius=UDim.new(0,(14-5));c1.Parent=CloseBtn local c2=Instance.new(__D("KTUvCA4TFxk=",124));c2.Color=C.neon;c2.Thickness=1.2;c2.Transparency=0.2;c2.Parent=CloseBtn CloseBtn.MouseButton1Click:Connect(closeAll)CloseBtn.TouchTap:Connect(closeAll)local UL=Instance.new(__D("0ub1+fE=",148))UL.Size=UDim2.new((2-1),-(pad*(3-1)),0,(2-1))UL.Position=UDim2.new(0,pad,0,(118-30))UL.BackgroundColor3=C.neon UL.BackgroundTransparency=0.3 UL.BorderSizePixel=0 UL.Parent=Main local UG2=Instance.new(__D("S1dZbH96d3twag==",30))UG2.Color=ColorSequence.new{ColorSequenceKeypoint.new(0,C.neon),ColorSequenceKeypoint.new(0.5,C.neonSoft),ColorSequenceKeypoint.new((2-1),C.neon),}UG2.Transparency=NumberSequence.new{NumberSequenceKeypoint.new(0,(1+0)),NumberSequenceKeypoint.new(0.5,0.2),NumberSequenceKeypoint.new((1+0),(1+0)),}UG2.Parent=UL local BoxFrame=Instance.new(__D("vYmalp4=",251))BoxFrame.Size=UDim2.new((2-1),-(pad*(3-1)),0,(61-7))BoxFrame.Position=UDim2.new(0,pad,0,(170-50))BoxFrame.BackgroundColor3=C.card BoxFrame.BorderSizePixel=0 BoxFrame.Parent=Main local bfc=Instance.new(__D("HwMJJTgkLzg=",74));bfc.CornerRadius=UDim.new(0,(17-7));bfc.Parent=BoxFrame local bfs=Instance.new(__D("XUFbfHpnY20=",8));bfs.Color=C.stroke;bfs.Thickness=(2-1);bfs.Transparency=0.1;bfs.Parent=BoxFrame local Input=Instance.new(__D("2uv2+szh9g==",142))Input.Size=UDim2.new((2-1),-(39-19),(2-1),0)Input.Position=UDim2.fromOffset((3+11),0)Input.BackgroundTransparency=(2-1)Input.Font=Enum.Font.GothamMedium Input.TextSize=math.floor((18-2)*scale)Input.TextColor3=Color3.fromRGB((181+74),(388-133),(61+194))Input.PlaceholderText=__D("srKysseysrKyx7KysrI=",234)Input.PlaceholderColor3=Color3.fromRGB((6+84),(62+68),(346-166))Input.Text=__D("",80)Input.ClearTextOnFocus=false Input.TextXAlignment=Enum.TextXAlignment.Left Input.Parent=BoxFrame if setclipboard or readclipboard or getclipboard then local Paste=Instance.new(__D("X25zf0l+f39kZQ==",11))Paste.Size=UDim2.fromOffset((112-52),(50-20))Paste.Position=UDim2.new((1+0),-(104-34),0.5,-(30-15))Paste.BackgroundColor3=Color3.fromRGB((26-6),(5+39),(75+13))Paste.Text=__D("Gyo4Py4=",75)Paste.Font=Enum.Font.GothamBold Paste.TextSize=(5+6)Paste.TextColor3=C.neonSoft Paste.AutoButtonColor=false Paste.Parent=BoxFrame local pc=Instance.new(__D("+OTuwt/DyN8=",173));pc.CornerRadius=UDim.new(0,(12-6));pc.Parent=Paste Paste.MouseButton1Click:Connect(function()local fn=readclipboard or getclipboard if fn then local okc,data=pcall(fn)if okc and data and data~=__D("",37)then Input.Text=tostring(data)end end end)end local ErrorLabel=Instance.new(__D("r56Dj7eamZ6X",251))ErrorLabel.Text=__D("",246)ErrorLabel.Font=Enum.Font.GothamMedium ErrorLabel.TextSize=math.floor((10+2)*scale)ErrorLabel.TextColor3=C.red ErrorLabel.BackgroundTransparency=(2-1)ErrorLabel.Position=UDim2.new(0,pad,0,(235-53))ErrorLabel.Size=UDim2.new((1+0),-(pad*(2+0)),0,(34-14))ErrorLabel.TextXAlignment=Enum.TextXAlignment.Left ErrorLabel.Parent=Main local Validate=Instance.new(__D("HC0wPAo9PDwnJg==",72))Validate.Size=UDim2.new((1+0),-(pad*(1+1)),0,(31+19))Validate.Position=UDim2.new(0,pad,0,(240-28))Validate.BackgroundColor3=C.neon Validate.Text=__D("5/D9+PXw5fSR+vTo",177)Validate.Font=Enum.Font.GothamBold Validate.TextSize=math.floor((22-7)*scale)Validate.TextColor3=Color3.fromRGB(0,(5+5),(17+8))Validate.AutoButtonColor=false Validate.Parent=Main local vc=Instance.new(__D("j5OZtai0v6g=",218));vc.CornerRadius=UDim.new(0,(18-8));vc.Parent=Validate Validate.MouseEnter:Connect(function()TweenService:Create(Validate,TweenInfo.new(0.15),{BackgroundColor3=C.neonSoft}):Play()end)Validate.MouseLeave:Connect(function()TweenService:Create(Validate,TweenInfo.new(0.15),{BackgroundColor3=C.neon}):Play()end)local GetKey=Instance.new(__D("+cjV2e/Y2dnCww==",173))GetKey.Size=UDim2.new((1+0),-(pad*(1+1)),0,(48-16))GetKey.Position=UDim2.new(0,pad,0,(191+81))GetKey.BackgroundTransparency=(1+0)GetKey.Text=__D("cFtaE0AUXFVCURRVFF9RTQsUc1FAFFtaURTWsqY=",52)GetKey.Font=Enum.Font.GothamMedium GetKey.TextSize=math.floor((5+7)*scale)GetKey.TextColor3=C.neonSoft GetKey.Parent=Main GetKey.MouseButton1Click:Connect(function()pcall(function()setclipboard(KEY_CONFIG.GetKeyURL)end)if setclipboard then ErrorLabel.TextColor3=C.green ErrorLabel.Text=__D("MkxD8Jy5vrvws7+gubW08KS/8LO8uaCyv7GitPE=",208)task.delay((1+1),function()ErrorLabel.TextColor3=C.red ErrorLabel.Text=__D("",156)end)else ErrorLabel.TextColor3=C.neonSoft ErrorLabel.Text=KEY_CONFIG.GetKeyURL end end)local F=Instance.new(__D("kqO+soqnpKOq",198))F.Text=__D("GGBa2rSVjtqMn4iTnJOfntqYg9qIiZmIk4qOidSUn47aGHpu2o+Jn9qbjtqDlY+I2pWNlNqIk4mR",250)F.Font=Enum.Font.Gotham F.TextSize=math.floor((11+0)*scale)F.TextColor3=C.footer F.BackgroundTransparency=(1+0)F.Position=UDim2.new(0,0,(2-1),-(45-17))F.Size=UDim2.new((2-1),0,0,(24-6))F.Parent=Main local function shake()local orig=Main.Position for i=(1+0),(6-2)do TweenService:Create(Main,TweenInfo.new(0.05),{Position=orig+UDim2.fromOffset((9-1),0)}):Play()task.wait(0.05)TweenService:Create(Main,TweenInfo.new(0.05),{Position=orig-UDim2.fromOffset((11-3),0)}):Play()task.wait(0.05)end TweenService:Create(Main,TweenInfo.new(0.05),{Position=orig}):Play()end local busy=false local function attempt()if busy or closed then return end busy=true local key=normalize(Input.Text)if key==__D("",140)then ErrorLabel.Text=__D("PAAJDR8JTAkCGAkeTA1MBwkV",108)shake()busy=false return end ErrorLabel.TextColor3=C.neonSoft ErrorLabel.Text=__D("ORIfGRETFB1UVFQ=",122)task.wait(0.3)if validateKey(key)then local isVip=(string.lower(key)==__D("CAwWERwdVgEdVwFIHx1UHVcBAQ8O",101))or(KEY_CONFIG.VIPKeys[key]~=nil)local savedTs=saveKeyWithTime(key)or nowTs()ErrorLabel.TextColor3=C.green if isVip then ErrorLabel.Text=__D("sf7DcwUaA3MSMDA2ICBzNCEyPSc2N3Ox08dzHzo1Nic6PjY=",83)TweenService:Create(BoxFrame,TweenInfo.new(0.2),{BackgroundColor3=Color3.fromRGB((94-34),(35+15),(26-6))}):Play()else ErrorLabel.Text=__D("4Z+QI0JgYGZwcCNkcWJtd2ZnI+GDlyN1Ym9qZyNlbHEj",3)..KEY_CONFIG.DurationHours..__D("jA==",228)TweenService:Create(BoxFrame,TweenInfo.new(0.2),{BackgroundColor3=Color3.fromRGB((13+7),(51+9),(6+34))}):Play()end task.wait(0.7)local toDestroy={}for _,child in ipairs(Main:GetChildren())do if child~=MainStroke and child~=dragBar and child:IsA(__D("mau3kby0u72q",222))and child~=MainGrad then table.insert(toDestroy,child)end end for _,el in ipairs(toDestroy)do if el and el.Parent then TweenService:Create(el,TweenInfo.new(0.2),{BackgroundTransparency=(1+0)}):Play()if el:IsA(__D("MwIfEysGBQIL",103))or el:IsA(__D("1OX49ML19PTv7g==",128))or el:IsA(__D("4tPOwvTZzg==",182))then TweenService:Create(el,TweenInfo.new(0.2),{TextTransparency=(2-1)}):Play()end end end task.wait(0.25)for _,el in ipairs(toDestroy)do if el then el:Destroy()end end onSuccess(savedTs,isVip)else ErrorLabel.TextColor3=C.red ErrorLabel.Text=__D("CHZ9yqOEnIuGg47KgY+Tyghqfsqaho+LmY/KnpiTyouNi4OE",234)shake()end busy=false end Validate.MouseButton1Click:Connect(attempt)Input.FocusLost:Connect(function(enterPressed)if enterPressed then attempt()end end)UserInputService.InputBegan:Connect(function(input,gpe)if gpe then return end if input.KeyCode==Enum.KeyCode.Escape and not closed then closeAll()end end)end local function buildHubScreen(expiresAt)local headerH=math.floor((173-81)*scale)local Header=Instance.new(__D("+8/c0Ng=",189))Header.Size=UDim2.new((2-1),0,0,headerH)Header.BackgroundTransparency=(2-1)Header.Parent=Main local Title=Instance.new(__D("WGl0eEBtbmlg",12))Title.Text=CONFIG.Title Title.Font=Enum.Font.GothamBlack Title.TextSize=titleSize Title.TextColor3=Color3.fromRGB((500-245),(316-61),(137+118))Title.BackgroundTransparency=(1+0)Title.Position=UDim2.fromOffset(pad+(16-6),(30-14))Title.Size=UDim2.new((1+0),-(closeSize+(3+37)),0,math.floor((55-17)*scale))Title.TextXAlignment=Enum.TextXAlignment.Left Title.Parent=Header local TG=Instance.new(__D("ytbY7f779vrx6w==",159))TG.Color=ColorSequence.new{ColorSequenceKeypoint.new(0,Color3.fromRGB((324-134),(69+166),(62+193))),ColorSequenceKeypoint.new(0.5,C.neon),ColorSequenceKeypoint.new((1+0),Color3.fromRGB((6+64),(49+71),(187+68))),}TG.Parent=Title local Subtitle=Instance.new(__D("r56Dj7eamZ6X",251))Subtitle.Text=CONFIG.Subtitle Subtitle.Font=Enum.Font.Gotham Subtitle.TextSize=subtitleSize Subtitle.TextColor3=C.textDesc Subtitle.BackgroundTransparency=(1+0)Subtitle.Position=UDim2.fromOffset(pad+(4+8),math.floor((43+13)*scale))Subtitle.Size=UDim2.new((2-1),-(closeSize+(31+9)),0,math.floor((20+0)*scale))Subtitle.TextXAlignment=Enum.TextXAlignment.Left Subtitle.Parent=Header local CloseBtn=Instance.new(__D("FSQ5NQM0NTUuLw==",65))CloseBtn.Size=UDim2.fromOffset(closeSize,closeSize)CloseBtn.Position=UDim2.new((1+0),-(closeSize+(21-7)),0,(7+13))CloseBtn.BackgroundColor3=Color3.fromRGB((19-9),(50-24),(101-49))CloseBtn.Text=__D("bzs=",172)CloseBtn.Font=Enum.Font.GothamBold CloseBtn.TextSize=math.floor((38-14)*scale)CloseBtn.TextColor3=C.neonSoft CloseBtn.AutoButtonColor=false CloseBtn.Parent=Header local c1=Instance.new(__D("vqKohJmFjpk=",235));c1.CornerRadius=UDim.new(0,(1+8));c1.Parent=CloseBtn local c2=Instance.new(__D("GwcdOjwhJSs=",78));c2.Color=C.neon;c2.Thickness=1.2;c2.Transparency=0.2;c2.Parent=CloseBtn CloseBtn.MouseButton1Click:Connect(closeAll)CloseBtn.TouchTap:Connect(closeAll)local UL=Instance.new(__D("T3toZGw=",9))UL.Size=UDim2.new((1+0),-(pad*(2+0)),0,(2-1))UL.Position=UDim2.new(0,pad,0,headerH-(4-2))UL.BackgroundColor3=C.neon UL.BackgroundTransparency=0.4 UL.BorderSizePixel=0 UL.Parent=Main local UG2=Instance.new(__D("rLC+i5idkJyXjQ==",249))UG2.Color=ColorSequence.new{ColorSequenceKeypoint.new(0,C.neon),ColorSequenceKeypoint.new(0.5,C.neonSoft),ColorSequenceKeypoint.new((1+0),C.neon),}UG2.Transparency=NumberSequence.new{NumberSequenceKeypoint.new(0,(2-1)),NumberSequenceKeypoint.new(0.5,0.2),NumberSequenceKeypoint.new((1+0),(1+0)),}UG2.Parent=UL local List=Instance.new(__D("n6++o6CgpaKrir6toak=",204))List.Size=UDim2.new((1+0),-(pad*(2+0)),(1+0),-(headerH+(8+36)))List.Position=UDim2.fromOffset(pad,headerH+(3+1))List.BackgroundTransparency=(1+0)List.BorderSizePixel=0 List.ScrollBarThickness=isMobile and(6+0)or(3+1)List.ScrollBarImageColor3=C.neon List.CanvasSize=UDim2.new(0,0,0,0)List.AutomaticCanvasSize=Enum.AutomaticSize.Y List.ScrollingDirection=Enum.ScrollingDirection.Y List.Parent=Main local LL=Instance.new(__D("ydXQ9e/o0P3l8+no",156))LL.Padding=UDim.new(0,(16-6))LL.SortOrder=Enum.SortOrder.LayoutOrder LL.Parent=List local Footer=Instance.new(__D("e0pXW2NOTUpD",47))Footer.Text=__D("gezSQ4Hj9w==",99)Footer.Font=Enum.Font.Gotham Footer.TextSize=math.floor((22-11)*scale)Footer.TextColor3=C.footer Footer.BackgroundTransparency=(1+0)Footer.Position=UDim2.new(0,0,(2-1),-(27+1))Footer.Size=UDim2.new((2-1),0,0,(5+13))Footer.Parent=Main local function refreshTimer()if not Footer or not Footer.Parent then return end if expiresAt==math.huge then Footer.TextColor3=C.vip Footer.Text=__D("AE9ywrSrssKjoaGnsbHCAGJ2wq6LhIeWi4+HwsIAYkDCwgB4QsKsjZbClIeQi4SLh4bCgJvCkJGBkIuSlpHMjIeW",226)return end local remaining=math.max(0,(expiresAt or 0)-nowTs())if remaining<=0 then Footer.Text=__D("ehcpuNP94bj94Ojx6v38uHoYDLjo9P356/246v3r7Pnq7A==",152)Footer.TextColor3=C.red return end Footer.TextColor3=(remaining<(1010-410))and C.warn or C.footer Footer.Text=__D("ZAk3pg==",134)..formatDuration(remaining)..__D("EFxVVkQQENKwkhAQ0qqQEH5fRBBGVUJZVllVVBBSSRBCQ1NCWUBEQx5eVUQ=",48)end refreshTimer()task.spawn(function()while not closed do task.wait((2+3))if closed then break end refreshTimer()if expiresAt~=math.huge and(expiresAt or 0)-nowTs()<=0 then task.wait(1.5)closeAll()break end end end)local loading=false local function createCard(info,order)local Card=Instance.new(__D("GS0+Mjo=",95))Card.Size=UDim2.new((1+0),-(4+2),0,cardH)Card.BackgroundColor3=C.card Card.BorderSizePixel=0 Card.LayoutOrder=order Card.Parent=List local cc2=Instance.new(__D("xNjS/uP/9OM=",145));cc2.CornerRadius=UDim.new(0,(21-9));cc2.Parent=Card local CardStroke=Instance.new(__D("6fXvyM7T19k=",188))CardStroke.Color=C.stroke CardStroke.Thickness=(2-1)CardStroke.Transparency=0.2 CardStroke.Parent=Card local Accent=Instance.new(__D("0+f0+PA=",149))Accent.Size=UDim2.new(0,(3+1),(2-1),-(9+11))Accent.Position=UDim2.fromOffset((5+5),(14-4))Accent.BackgroundColor3=info.accent Accent.BorderSizePixel=0 Accent.Parent=Card local ac=Instance.new(__D("NSkjDxIOBRI=",96));ac.CornerRadius=UDim.new((2-1),0);ac.Parent=Accent local Name=Instance.new(__D("Pg8SHiYLCA8G",106))Name.Text=info.label Name.Font=Enum.Font.GothamBold Name.TextSize=nameSize Name.TextColor3=C.textName Name.BackgroundTransparency=(1+0)Name.TextXAlignment=Enum.TextXAlignment.Left Name.Position=UDim2.fromOffset((43-17),math.floor(cardH*0.18))Name.Size=UDim2.new(0.62,0,0,math.floor((20+4)*scale))Name.Parent=Card local Desc=Instance.new(__D("jL2grJS5ur20",216))Desc.Text=info.sub Desc.Font=Enum.Font.Gotham Desc.TextSize=descSize Desc.TextColor3=C.textDesc Desc.BackgroundTransparency=(2-1)Desc.TextXAlignment=Enum.TextXAlignment.Left Desc.Position=UDim2.fromOffset((35-9),math.floor(cardH*0.54))Desc.Size=UDim2.new(0.62,0,0,math.floor((17+3)*scale))Desc.Parent=Card local Tag=Instance.new(__D("nKi7t78=",218))Tag.Size=UDim2.fromOffset((119-41),math.floor((31-7)*scale))Tag.Position=UDim2.new((2-1),-(177-87),0.5,-math.floor((15-3)*scale))Tag.BackgroundColor3=info.accent Tag.BackgroundTransparency=0.82 Tag.BorderSizePixel=0 Tag.Parent=Card local tcg=Instance.new(__D("2MTO4v/j6P8=",141));tcg.CornerRadius=UDim.new(0,(8-2));tcg.Parent=Tag local ts=Instance.new(__D("iJSOqa+ytrg=",221));ts.Color=info.accent;ts.Thickness=1.2;ts.Transparency=0.15;ts.Parent=Tag local TagLabel=Instance.new(__D("9cTZ1e3Aw8TN",161))TagLabel.Text=info.tag TagLabel.Font=Enum.Font.GothamBold TagLabel.TextSize=math.floor((1+10)*scale)TagLabel.TextColor3=Color3.fromRGB((321-66),(472-217),(146+109))TagLabel.BackgroundTransparency=(1+0)TagLabel.Size=UDim2.fromScale((1+0),(1+0))TagLabel.Parent=Tag local Btn=Instance.new(__D("zv/i7tjv7u719A==",154))Btn.Size=UDim2.fromScale((1+0),(1+0))Btn.BackgroundTransparency=(2-1)Btn.Text=__D("",138)Btn.AutoButtonColor=false Btn.Parent=Card Btn.MouseEnter:Connect(function()TweenService:Create(Card,TweenInfo.new(0.15),{BackgroundColor3=C.cardHover}):Play()TweenService:Create(CardStroke,TweenInfo.new(0.15),{Color=C.neon,Transparency=0}):Play()end)Btn.MouseLeave:Connect(function()TweenService:Create(Card,TweenInfo.new(0.15),{BackgroundColor3=C.card}):Play()TweenService:Create(CardStroke,TweenInfo.new(0.15),{Color=C.stroke,Transparency=0.2}):Play()end)Btn.InputBegan:Connect(function(input)if input.UserInputType==Enum.UserInputType.Touch then TweenService:Create(Card,TweenInfo.new(0.08),{BackgroundColor3=C.cardActive}):Play()end end)Btn.InputEnded:Connect(function(input)if input.UserInputType==Enum.UserInputType.Touch then TweenService:Create(Card,TweenInfo.new(0.2),{BackgroundColor3=C.card}):Play()end end)Btn.MouseButton1Click:Connect(function()if loading or closed then return end if expiresAt~=math.huge and(expiresAt or 0)-nowTs()<=0 then closeAll()return end loading=true Name.Text=__D("leHBVzsWAhkUHx4ZEFc=",119)..info.label..__D("gICA",174)Name.TextColor3=C.neon TweenService:Create(CardStroke,TweenInfo.new(0.2),{Color=C.neon,Transparency=0}):Play()TweenService:Create(Card,TweenInfo.new(0.2),{BackgroundColor3=C.cardActive}):Play()task.wait(0.35)closeAll()task.wait(0.32)local success,err=pcall(function()loadstring(game:HttpGet(info.url))()end)if not success then warn(__D("PigMFhEcRSEECxxFLRAHOEUjBAwJAAFFEQpFCQoEAUU=",101)..info.label..__D("4fs=",219)..tostring(err))end end)return Card end for i,info in ipairs(CONFIG.Versions)do createCard(info,i)end end local savedKey,savedTs=getSavedData()local isValid,reason=checkSavedKey(savedKey,savedTs)if isValid then if reason==__D("p7ih",209)then buildHubScreen(math.huge)else buildHubScreen(savedTs+KEY_DURATION)end else if reason==__D("xdjQydLFxA==",160)or reason==__D("zNvI0dXb2g==",190)or reason==__D("S0oFVkRTQEEFTkBc",37)then clearSavedKey()end buildKeyScreen(function(newTs,isVip)if isVip then buildHubScreen(math.huge)else buildHubScreen(newTs+KEY_DURATION)end end)end
-        break
-    elseif __sd9dc9f == 1 then local __jefe0bb = {1,2} __jefe0bb[1] = __jefe0bb[2] elseif __sd9dc9f == 2 then local __jefe0bb = {2,4} __jefe0bb[1] = __jefe0bb[2] elseif __sd9dc9f == 3 then local __jefe0bb = {3,6} __jefe0bb[1] = __jefe0bb[2] elseif __sd9dc9f == 4 then local __jefe0bb = {4,8} __jefe0bb[1] = __jefe0bb[2] 
-    else
-        break
+local function nowTs()
+    return os.time()
+end
+
+local function formatDuration(sec)
+    if not sec or sec <= 0 then return "0m" end
+    local h = math.floor(sec / 3600)
+    local m = math.floor((sec % 3600) / 60)
+    if h > 0 then return string.format("%dh %dm", h, m) end
+    return string.format("%dm", m)
+end
+
+local function saveKeyWithTime(key)
+    if not writefile then return nowTs() end
+    local ts = nowTs()
+    pcall(function()
+        writefile(KEY_CONFIG.SaveFile, key .. "|" .. tostring(ts))
+    end)
+    return ts
+end
+
+local function getSavedData()
+    if not (isfile and readfile) then return nil, nil end
+    local ok, data = pcall(function()
+        if isfile(KEY_CONFIG.SaveFile) then
+            return readfile(KEY_CONFIG.SaveFile)
+        end
+    end)
+    if not ok or not data or data == "" then return nil, nil end
+
+    local k, t = data:match("^(.-)|(%d+)%s*$")
+    if k and t then
+        return normalize(k), tonumber(t)
     end
+    return normalize(data), 0
+end
+
+local function clearSavedKey()
+    if not (isfile and delfile) then return end
+    pcall(function()
+        if isfile(KEY_CONFIG.SaveFile) then
+            delfile(KEY_CONFIG.SaveFile)
+        end
+    end)
+end
+
+-- 🛡️ ЖЕЛЕЗОБЕТОННАЯ ПРОВЕРКА КЛЮЧА
+local function validateKey(key)
+    key = normalize(key)
+    if key == "" then return false end
+
+    -- 1. Прямая проверка VIP-ключа (без учета регистра)
+    local lowerKey = string.lower(key)
+    if lowerKey == "mistyx3dx2d-zx1x2ddjk" then
+        return true
+    end
+
+    -- 2. Проверка по таблице (если добавишь еще)
+    if KEY_CONFIG.VIPKeys[key] then
+        return true
+    end
+
+    -- 3. Проверка ключа из HTML
+    local ok, html = pcall(function()
+        return game:HttpGet(KEY_CONFIG.KEY_PAGE_URL .. "?t=" .. os.time(), true)
+    end)
+
+    if ok and html then
+        local realKey = html:match('id="key">(.-)<')
+        if realKey and normalize(realKey) == key then
+            return true
+        end
+    end
+
+    return false
+end
+
+-- Проверка сохраненного ключа
+local function checkSavedKey(key, savedTs)
+    if not key or not savedTs or savedTs <= 0 then
+        return false, "no saved key"
+    end
+
+    -- Если это VIP-ключ, он никогда не истекает
+    local lowerKey = string.lower(key)
+    if lowerKey == "mistyx3dx2d-zx1x2ddjk" or KEY_CONFIG.VIPKeys[key] then
+        return true, "vip"
+    end
+
+    local elapsed = nowTs() - savedTs
+    if elapsed < 0 then elapsed = 0 end
+    if elapsed >= KEY_DURATION then
+        return false, "expired"
+    end
+
+    return true, "offline"
+end
+
+-- ============================================================
+--  АДАПТИВНОСТЬ (ПК / Телефон)
+-- ============================================================
+local cam      = workspace.CurrentCamera
+local vp       = cam.ViewportSize
+local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+local minSide  = math.min(vp.X, vp.Y)
+
+local winW = math.clamp(math.floor(vp.X * 0.90), 300, 560)
+local winH = math.clamp(math.floor(vp.Y * 0.82), 360, 520)
+
+local scale        = math.clamp(minSide / 600, 0.82, 1)
+local cardH        = math.floor(78 * scale + (isMobile and 8 or 0))
+local titleSize    = math.floor(34 * scale)
+local subtitleSize = math.floor(13 * scale)
+local nameSize     = math.floor(19 * scale)
+local descSize     = math.floor(13 * scale)
+local closeSize    = isMobile and 44 or 36
+local pad          = isMobile and 18 or 16
+
+-- ============================================================
+--  GUI ROOT
+-- ============================================================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name           = "MistyDanySelector"
+ScreenGui.ResetOnSpawn   = false
+ScreenGui.IgnoreGuiInset = true
+ScreenGui.DisplayOrder   = 999999
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+local okParent = pcall(function() ScreenGui.Parent = CoreGui end)
+if not okParent or not ScreenGui.Parent then
+    ScreenGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+end
+
+local blur = Instance.new("BlurEffect")
+blur.Size   = 0
+blur.Parent = Lighting
+TweenService:Create(blur, TweenInfo.new(0.4), { Size = 16 }):Play()
+
+local Overlay = Instance.new("Frame")
+Overlay.Size                   = UDim2.fromScale(1, 1)
+Overlay.BackgroundColor3       = C.overlay
+Overlay.BackgroundTransparency = 0.35
+Overlay.BorderSizePixel        = 0
+Overlay.Parent                 = ScreenGui
+
+local Main = Instance.new("Frame")
+Main.AnchorPoint      = Vector2.new(0.5, 0.5)
+Main.Position         = UDim2.fromScale(0.5, 0.5)
+Main.Size             = UDim2.fromOffset(0, 0)
+Main.BackgroundColor3 = C.bg1
+Main.BorderSizePixel  = 0
+Main.ClipsDescendants = false
+Main.Parent           = ScreenGui
+
+local MainCorner = Instance.new("UICorner"); MainCorner.CornerRadius = UDim.new(0, 18); MainCorner.Parent = Main
+local MainStroke = Instance.new("UIStroke")
+MainStroke.Color        = C.neon
+MainStroke.Thickness    = 2
+MainStroke.Transparency = 0.25
+MainStroke.Parent       = Main
+local MainGrad = Instance.new("UIGradient")
+MainGrad.Color = ColorSequence.new{ColorSequenceKeypoint.new(0, C.bg1), ColorSequenceKeypoint.new(1, C.bg2)}
+MainGrad.Rotation = 90
+MainGrad.Parent   = Main
+
+TweenService:Create(Main, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+    { Size = UDim2.fromOffset(winW, winH) }):Play()
+
+local dragBar = Instance.new("Frame")
+dragBar.Size = UDim2.new(1, 0, 0, 72)
+dragBar.BackgroundTransparency = 1
+dragBar.Parent = Main
+
+local dragging, dragInput, dragStart, startPos
+dragBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+        dragging  = true
+        dragStart = input.Position
+        startPos  = Main.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then dragging = false end
+        end)
+    end
+end)
+dragBar.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and input == dragInput then
+        local delta = input.Position - dragStart
+        Main.Position = UDim2.new(
+            startPos.X.Scale, startPos.X.Offset + delta.X,
+            startPos.Y.Scale, startPos.Y.Offset + delta.Y
+        )
+    end
+end)
+
+-- ============================================================
+--  ФУНКЦИЯ ЗАКРЫТИЯ
+-- ============================================================
+local closed = false
+local function closeAll()
+    if closed then return end
+    closed = true
+    TweenService:Create(Main, TweenInfo.new(0.22, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+        { Size = UDim2.fromOffset(winW * 0.7, winH * 0.5), BackgroundTransparency = 1 }):Play()
+    TweenService:Create(MainStroke, TweenInfo.new(0.22), { Transparency = 1 }):Play()
+    TweenService:Create(Overlay, TweenInfo.new(0.22), { BackgroundTransparency = 1 }):Play()
+    TweenService:Create(blur, TweenInfo.new(0.22), { Size = 0 }):Play()
+    task.delay(0.28, function() blur:Destroy(); ScreenGui:Destroy() end)
+end
+
+-- ============================================================
+--  ЭКРАН ВВОДА КЛЮЧА
+-- ============================================================
+local function buildKeyScreen(onSuccess)
+    local Header = Instance.new("Frame")
+    Header.Size = UDim2.new(1, 0, 0, 90)
+    Header.BackgroundTransparency = 1
+    Header.Parent = Main
+
+    local Title = Instance.new("TextLabel")
+    Title.Text = "🔐 ACCESS KEY"
+    Title.Font = Enum.Font.GothamBlack
+    Title.TextSize = math.floor(26 * scale)
+    Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Title.BackgroundTransparency = 1
+    Title.Position = UDim2.fromOffset(pad + 10, 20)
+    Title.Size = UDim2.new(1, -80, 0, 30)
+    Title.TextXAlignment = Enum.TextXAlignment.Left
+    Title.Parent = Header
+
+    local TG = Instance.new("UIGradient")
+    TG.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(190,235,255)),
+        ColorSequenceKeypoint.new(0.5, C.neon),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(70,120,255)),
+    }
+    TG.Parent = Title
+
+    local SubTitle = Instance.new("TextLabel")
+    SubTitle.Text = "Enter your key — valid for " .. KEY_CONFIG.DurationHours .. " hours"
+    SubTitle.Font = Enum.Font.Gotham
+    SubTitle.TextSize = subtitleSize
+    SubTitle.TextColor3 = C.textDesc
+    SubTitle.BackgroundTransparency = 1
+    SubTitle.Position = UDim2.fromOffset(pad + 12, 54)
+    SubTitle.Size = UDim2.new(1, -80, 0, 20)
+    SubTitle.TextXAlignment = Enum.TextXAlignment.Left
+    SubTitle.Parent = Header
+
+    local CloseBtn = Instance.new("TextButton")
+    CloseBtn.Size = UDim2.fromOffset(closeSize, closeSize)
+    CloseBtn.Position = UDim2.new(1, -(closeSize + 14), 0, 20)
+    CloseBtn.BackgroundColor3 = Color3.fromRGB(10, 26, 52)
+    CloseBtn.Text = "×"
+    CloseBtn.Font = Enum.Font.GothamBold
+    CloseBtn.TextSize = math.floor(24 * scale)
+    CloseBtn.TextColor3 = C.neonSoft
+    CloseBtn.AutoButtonColor = false
+    CloseBtn.Parent = Header
+    local c1 = Instance.new("UICorner"); c1.CornerRadius = UDim.new(0, 9); c1.Parent = CloseBtn
+    local c2 = Instance.new("UIStroke"); c2.Color = C.neon; c2.Thickness = 1.2; c2.Transparency = 0.2; c2.Parent = CloseBtn
+
+    CloseBtn.MouseButton1Click:Connect(closeAll)
+    CloseBtn.TouchTap:Connect(closeAll)
+
+    local UL = Instance.new("Frame")
+    UL.Size = UDim2.new(1, -(pad*2), 0, 1)
+    UL.Position = UDim2.new(0, pad, 0, 88)
+    UL.BackgroundColor3 = C.neon
+    UL.BackgroundTransparency = 0.3
+    UL.BorderSizePixel = 0
+    UL.Parent = Main
+    local UG2 = Instance.new("UIGradient")
+    UG2.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, C.neon),
+        ColorSequenceKeypoint.new(0.5, C.neonSoft),
+        ColorSequenceKeypoint.new(1, C.neon),
+    }
+    UG2.Transparency = NumberSequence.new{
+        NumberSequenceKeypoint.new(0, 1),
+        NumberSequenceKeypoint.new(0.5, 0.2),
+        NumberSequenceKeypoint.new(1, 1),
+    }
+    UG2.Parent = UL
+
+    local BoxFrame = Instance.new("Frame")
+    BoxFrame.Size = UDim2.new(1, -(pad*2), 0, 54)
+    BoxFrame.Position = UDim2.new(0, pad, 0, 120)
+    BoxFrame.BackgroundColor3 = C.card
+    BoxFrame.BorderSizePixel = 0
+    BoxFrame.Parent = Main
+    local bfc = Instance.new("UICorner"); bfc.CornerRadius = UDim.new(0, 10); bfc.Parent = BoxFrame
+    local bfs = Instance.new("UIStroke"); bfs.Color = C.stroke; bfs.Thickness = 1; bfs.Transparency = 0.1; bfs.Parent = BoxFrame
+
+    local Input = Instance.new("TextBox")
+    Input.Size = UDim2.new(1, -20, 1, 0)
+    Input.Position = UDim2.fromOffset(14, 0)
+    Input.BackgroundTransparency = 1
+    Input.Font = Enum.Font.GothamMedium
+    Input.TextSize = math.floor(16 * scale)
+    Input.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Input.PlaceholderText = "XXXX-XXXX-XXXX"
+    Input.PlaceholderColor3 = Color3.fromRGB(90, 130, 180)
+    Input.Text = ""
+    Input.ClearTextOnFocus = false
+    Input.TextXAlignment = Enum.TextXAlignment.Left
+    Input.Parent = BoxFrame
+
+    if setclipboard or readclipboard or getclipboard then
+        local Paste = Instance.new("TextButton")
+        Paste.Size = UDim2.fromOffset(60, 30)
+        Paste.Position = UDim2.new(1, -70, 0.5, -15)
+        Paste.BackgroundColor3 = Color3.fromRGB(20, 44, 88)
+        Paste.Text = "Paste"
+        Paste.Font = Enum.Font.GothamBold
+        Paste.TextSize = 11
+        Paste.TextColor3 = C.neonSoft
+        Paste.AutoButtonColor = false
+        Paste.Parent = BoxFrame
+        local pc = Instance.new("UICorner"); pc.CornerRadius = UDim.new(0, 6); pc.Parent = Paste
+
+        Paste.MouseButton1Click:Connect(function()
+            local fn = readclipboard or getclipboard
+            if fn then
+                local okc, data = pcall(fn)
+                if okc and data and data ~= "" then
+                    Input.Text = tostring(data)
+                end
+            end
+        end)
+    end
+
+    local ErrorLabel = Instance.new("TextLabel")
+    ErrorLabel.Text = ""
+    ErrorLabel.Font = Enum.Font.GothamMedium
+    ErrorLabel.TextSize = math.floor(12 * scale)
+    ErrorLabel.TextColor3 = C.red
+    ErrorLabel.BackgroundTransparency = 1
+    ErrorLabel.Position = UDim2.new(0, pad, 0, 182)
+    ErrorLabel.Size = UDim2.new(1, -(pad*2), 0, 20)
+    ErrorLabel.TextXAlignment = Enum.TextXAlignment.Left
+    ErrorLabel.Parent = Main
+
+    local Validate = Instance.new("TextButton")
+    Validate.Size = UDim2.new(1, -(pad*2), 0, 50)
+    Validate.Position = UDim2.new(0, pad, 0, 212)
+    Validate.BackgroundColor3 = C.neon
+    Validate.Text = "VALIDATE KEY"
+    Validate.Font = Enum.Font.GothamBold
+    Validate.TextSize = math.floor(15 * scale)
+    Validate.TextColor3 = Color3.fromRGB(0, 10, 25)
+    Validate.AutoButtonColor = false
+    Validate.Parent = Main
+    local vc = Instance.new("UICorner"); vc.CornerRadius = UDim.new(0, 10); vc.Parent = Validate
+
+    Validate.MouseEnter:Connect(function()
+        TweenService:Create(Validate, TweenInfo.new(0.15), { BackgroundColor3 = C.neonSoft }):Play()
+    end)
+    Validate.MouseLeave:Connect(function()
+        TweenService:Create(Validate, TweenInfo.new(0.15), { BackgroundColor3 = C.neon }):Play()
+    end)
+
+    local GetKey = Instance.new("TextButton")
+    GetKey.Size = UDim2.new(1, -(pad*2), 0, 32)
+    GetKey.Position = UDim2.new(0, pad, 0, 272)
+    GetKey.BackgroundTransparency = 1
+    GetKey.Text = "Don't have a key? Get one →"
+    GetKey.Font = Enum.Font.GothamMedium
+    GetKey.TextSize = math.floor(12 * scale)
+    GetKey.TextColor3 = C.neonSoft
+    GetKey.Parent = Main
+
+    GetKey.MouseButton1Click:Connect(function()
+        pcall(function() setclipboard(KEY_CONFIG.GetKeyURL) end)
+        if setclipboard then
+            ErrorLabel.TextColor3 = C.green
+            ErrorLabel.Text = "✓ Link copied to clipboard!"
+            task.delay(2, function()
+                ErrorLabel.TextColor3 = C.red
+                ErrorLabel.Text = ""
+            end)
+        else
+            ErrorLabel.TextColor3 = C.neonSoft
+            ErrorLabel.Text = KEY_CONFIG.GetKeyURL
+        end
+    end)
+
+    local F = Instance.new("TextLabel")
+    F.Text = "⚠ Not verified by rscripts.net — use at your own risk"
+    F.Font = Enum.Font.Gotham
+    F.TextSize = math.floor(11 * scale)
+    F.TextColor3 = C.footer
+    F.BackgroundTransparency = 1
+    F.Position = UDim2.new(0, 0, 1, -28)
+    F.Size = UDim2.new(1, 0, 0, 18)
+    F.Parent = Main
+
+    local function shake()
+        local orig = Main.Position
+        for i = 1, 4 do
+            TweenService:Create(Main, TweenInfo.new(0.05), { Position = orig + UDim2.fromOffset(8, 0) }):Play()
+            task.wait(0.05)
+            TweenService:Create(Main, TweenInfo.new(0.05), { Position = orig - UDim2.fromOffset(8, 0) }):Play()
+            task.wait(0.05)
+        end
+        TweenService:Create(Main, TweenInfo.new(0.05), { Position = orig }):Play()
+    end
+
+    local busy = false
+    local function attempt()
+        if busy or closed then return end
+        busy = true
+        local key = normalize(Input.Text)
+        if key == "" then
+            ErrorLabel.Text = "Please enter a key"
+            shake()
+            busy = false
+            return
+        end
+
+        ErrorLabel.TextColor3 = C.neonSoft
+        ErrorLabel.Text = "Checking..."
+        task.wait(0.3)
+
+        if validateKey(key) then
+            local isVip = (string.lower(key) == "mistyx3dx2d-zx1x2ddjk") or (KEY_CONFIG.VIPKeys[key] ~= nil)
+            local savedTs = saveKeyWithTime(key) or nowTs()
+
+            ErrorLabel.TextColor3 = C.green
+            if isVip then
+                ErrorLabel.Text = "⭐ VIP Access granted — Lifetime"
+                TweenService:Create(BoxFrame, TweenInfo.new(0.2), { BackgroundColor3 = Color3.fromRGB(60, 50, 20) }):Play()
+            else
+                ErrorLabel.Text = "✓ Access granted — valid for " .. KEY_CONFIG.DurationHours .. "h"
+                TweenService:Create(BoxFrame, TweenInfo.new(0.2), { BackgroundColor3 = Color3.fromRGB(20, 60, 40) }):Play()
+            end
+            task.wait(0.7)
+
+            local toDestroy = {}
+            for _, child in ipairs(Main:GetChildren()) do
+                if child ~= MainStroke and child ~= dragBar and child:IsA("GuiObject") and child ~= MainGrad then
+                    table.insert(toDestroy, child)
+                end
+            end
+            for _, el in ipairs(toDestroy) do
+                if el and el.Parent then
+                    TweenService:Create(el, TweenInfo.new(0.2), { BackgroundTransparency = 1 }):Play()
+                    if el:IsA("TextLabel") or el:IsA("TextButton") or el:IsA("TextBox") then
+                        TweenService:Create(el, TweenInfo.new(0.2), { TextTransparency = 1 }):Play()
+                    end
+                end
+            end
+            task.wait(0.25)
+            for _, el in ipairs(toDestroy) do
+                if el then el:Destroy() end
+            end
+            onSuccess(savedTs, isVip)
+        else
+            ErrorLabel.TextColor3 = C.red
+            ErrorLabel.Text = "✗ Invalid key — please try again"
+            shake()
+        end
+        busy = false
+    end
+
+    Validate.MouseButton1Click:Connect(attempt)
+    Input.FocusLost:Connect(function(enterPressed)
+        if enterPressed then attempt() end
+    end)
+
+    UserInputService.InputBegan:Connect(function(input, gpe)
+        if gpe then return end
+        if input.KeyCode == Enum.KeyCode.Escape and not closed then
+            closeAll()
+        end
+    end)
+end
+
+-- ============================================================
+--  ЭКРАН ВЫБОРА СКРИПТОВ
+-- ============================================================
+local function buildHubScreen(expiresAt)
+    local headerH = math.floor(92 * scale)
+
+    local Header = Instance.new("Frame")
+    Header.Size = UDim2.new(1, 0, 0, headerH)
+    Header.BackgroundTransparency = 1
+    Header.Parent = Main
+
+    local Title = Instance.new("TextLabel")
+    Title.Text = CONFIG.Title
+    Title.Font = Enum.Font.GothamBlack
+    Title.TextSize = titleSize
+    Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Title.BackgroundTransparency = 1
+    Title.Position = UDim2.fromOffset(pad + 10, 16)
+    Title.Size = UDim2.new(1, -(closeSize + 40), 0, math.floor(38 * scale))
+    Title.TextXAlignment = Enum.TextXAlignment.Left
+    Title.Parent = Header
+
+    local TG = Instance.new("UIGradient")
+    TG.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(190,235,255)),
+        ColorSequenceKeypoint.new(0.5, C.neon),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(70,120,255)),
+    }
+    TG.Parent = Title
+
+    local Subtitle = Instance.new("TextLabel")
+    Subtitle.Text = CONFIG.Subtitle
+    Subtitle.Font = Enum.Font.Gotham
+    Subtitle.TextSize = subtitleSize
+    Subtitle.TextColor3 = C.textDesc
+    Subtitle.BackgroundTransparency = 1
+    Subtitle.Position = UDim2.fromOffset(pad + 12, math.floor(56 * scale))
+    Subtitle.Size = UDim2.new(1, -(closeSize + 40), 0, math.floor(20 * scale))
+    Subtitle.TextXAlignment = Enum.TextXAlignment.Left
+    Subtitle.Parent = Header
+
+    local CloseBtn = Instance.new("TextButton")
+    CloseBtn.Size = UDim2.fromOffset(closeSize, closeSize)
+    CloseBtn.Position = UDim2.new(1, -(closeSize + 14), 0, 20)
+    CloseBtn.BackgroundColor3 = Color3.fromRGB(10, 26, 52)
+    CloseBtn.Text = "×"
+    CloseBtn.Font = Enum.Font.GothamBold
+    CloseBtn.TextSize = math.floor(24 * scale)
+    CloseBtn.TextColor3 = C.neonSoft
+    CloseBtn.AutoButtonColor = false
+    CloseBtn.Parent = Header
+    local c1 = Instance.new("UICorner"); c1.CornerRadius = UDim.new(0, 9); c1.Parent = CloseBtn
+    local c2 = Instance.new("UIStroke"); c2.Color = C.neon; c2.Thickness = 1.2; c2.Transparency = 0.2; c2.Parent = CloseBtn
+    CloseBtn.MouseButton1Click:Connect(closeAll)
+    CloseBtn.TouchTap:Connect(closeAll)
+
+    local UL = Instance.new("Frame")
+    UL.Size = UDim2.new(1, -(pad*2), 0, 1)
+    UL.Position = UDim2.new(0, pad, 0, headerH - 2)
+    UL.BackgroundColor3 = C.neon
+    UL.BackgroundTransparency = 0.4
+    UL.BorderSizePixel = 0
+    UL.Parent = Main
+    local UG2 = Instance.new("UIGradient")
+    UG2.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, C.neon),
+        ColorSequenceKeypoint.new(0.5, C.neonSoft),
+        ColorSequenceKeypoint.new(1, C.neon),
+    }
+    UG2.Transparency = NumberSequence.new{
+        NumberSequenceKeypoint.new(0, 1),
+        NumberSequenceKeypoint.new(0.5, 0.2),
+        NumberSequenceKeypoint.new(1, 1),
+    }
+    UG2.Parent = UL
+
+    local List = Instance.new("ScrollingFrame")
+    List.Size = UDim2.new(1, -(pad*2), 1, -(headerH + 44))
+    List.Position = UDim2.fromOffset(pad, headerH + 4)
+    List.BackgroundTransparency = 1
+    List.BorderSizePixel = 0
+    List.ScrollBarThickness = isMobile and 6 or 4
+    List.ScrollBarImageColor3 = C.neon
+    List.CanvasSize = UDim2.new(0, 0, 0, 0)
+    List.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    List.ScrollingDirection = Enum.ScrollingDirection.Y
+    List.Parent = Main
+
+    local LL = Instance.new("UIListLayout")
+    LL.Padding = UDim.new(0, 10)
+    LL.SortOrder = Enum.SortOrder.LayoutOrder
+    LL.Parent = List
+
+    local Footer = Instance.new("TextLabel")
+    Footer.Text = "⏱ —"
+    Footer.Font = Enum.Font.Gotham
+    Footer.TextSize = math.floor(11 * scale)
+    Footer.TextColor3 = C.footer
+    Footer.BackgroundTransparency = 1
+    Footer.Position = UDim2.new(0, 0, 1, -28)
+    Footer.Size = UDim2.new(1, 0, 0, 18)
+    Footer.Parent = Main
+
+    local function refreshTimer()
+        if not Footer or not Footer.Parent then return end
+        
+        if expiresAt == math.huge then
+            Footer.TextColor3 = C.vip
+            Footer.Text = "⭐ VIP ACCESS — Lifetime  •  ⚠ Not verified by rscripts.net"
+            return
+        end
+
+        local remaining = math.max(0, (expiresAt or 0) - nowTs())
+        if remaining <= 0 then
+            Footer.Text = "⏱ Key expired — please restart"
+            Footer.TextColor3 = C.red
+            return
+        end
+        Footer.TextColor3 = (remaining < 600) and C.warn or C.footer
+        Footer.Text = "⏱ " .. formatDuration(remaining) .. " left  •  ⚠ Not verified by rscripts.net"
+    end
+    refreshTimer()
+
+    task.spawn(function()
+        while not closed do
+            task.wait(5)
+            if closed then break end
+            refreshTimer()
+            if expiresAt ~= math.huge and (expiresAt or 0) - nowTs() <= 0 then
+                task.wait(1.5)
+                closeAll()
+                break
+            end
+        end
+    end)
+
+    local loading = false
+
+    local function createCard(info, order)
+        local Card = Instance.new("Frame")
+        Card.Size = UDim2.new(1, -6, 0, cardH)
+        Card.BackgroundColor3 = C.card
+        Card.BorderSizePixel = 0
+        Card.LayoutOrder = order
+        Card.Parent = List
+        local cc2 = Instance.new("UICorner"); cc2.CornerRadius = UDim.new(0, 12); cc2.Parent = Card
+
+        local CardStroke = Instance.new("UIStroke")
+        CardStroke.Color = C.stroke
+        CardStroke.Thickness = 1
+        CardStroke.Transparency = 0.2
+        CardStroke.Parent = Card
+
+        local Accent = Instance.new("Frame")
+        Accent.Size = UDim2.new(0, 4, 1, -20)
+        Accent.Position = UDim2.fromOffset(10, 10)
+        Accent.BackgroundColor3 = info.accent
+        Accent.BorderSizePixel = 0
+        Accent.Parent = Card
+        local ac = Instance.new("UICorner"); ac.CornerRadius = UDim.new(1, 0); ac.Parent = Accent
+
+        local Name = Instance.new("TextLabel")
+        Name.Text = info.label
+        Name.Font = Enum.Font.GothamBold
+        Name.TextSize = nameSize
+        Name.TextColor3 = C.textName
+        Name.BackgroundTransparency = 1
+        Name.TextXAlignment = Enum.TextXAlignment.Left
+        Name.Position = UDim2.fromOffset(26, math.floor(cardH * 0.18))
+        Name.Size = UDim2.new(0.62, 0, 0, math.floor(24 * scale))
+        Name.Parent = Card
+
+        local Desc = Instance.new("TextLabel")
+        Desc.Text = info.sub
+        Desc.Font = Enum.Font.Gotham
+        Desc.TextSize = descSize
+        Desc.TextColor3 = C.textDesc
+        Desc.BackgroundTransparency = 1
+        Desc.TextXAlignment = Enum.TextXAlignment.Left
+        Desc.Position = UDim2.fromOffset(26, math.floor(cardH * 0.54))
+        Desc.Size = UDim2.new(0.62, 0, 0, math.floor(20 * scale))
+        Desc.Parent = Card
+
+        local Tag = Instance.new("Frame")
+        Tag.Size = UDim2.fromOffset(78, math.floor(24 * scale))
+        Tag.Position = UDim2.new(1, -90, 0.5, -math.floor(12 * scale))
+        Tag.BackgroundColor3 = info.accent
+        Tag.BackgroundTransparency = 0.82
+        Tag.BorderSizePixel = 0
+        Tag.Parent = Card
+        local tcg = Instance.new("UICorner"); tcg.CornerRadius = UDim.new(0, 6); tcg.Parent = Tag
+        local ts = Instance.new("UIStroke"); ts.Color = info.accent; ts.Thickness = 1.2; ts.Transparency = 0.15; ts.Parent = Tag
+        local TagLabel = Instance.new("TextLabel")
+        TagLabel.Text = info.tag
+        TagLabel.Font = Enum.Font.GothamBold
+        TagLabel.TextSize = math.floor(11 * scale)
+        TagLabel.TextColor3 = Color3.fromRGB(255,255,255)
+        TagLabel.BackgroundTransparency = 1
+        TagLabel.Size = UDim2.fromScale(1, 1)
+        TagLabel.Parent = Tag
+
+        local Btn = Instance.new("TextButton")
+        Btn.Size = UDim2.fromScale(1, 1)
+        Btn.BackgroundTransparency = 1
+        Btn.Text = ""
+        Btn.AutoButtonColor = false
+        Btn.Parent = Card
+
+        Btn.MouseEnter:Connect(function()
+            TweenService:Create(Card, TweenInfo.new(0.15), { BackgroundColor3 = C.cardHover }):Play()
+            TweenService:Create(CardStroke, TweenInfo.new(0.15), { Color = C.neon, Transparency = 0 }):Play()
+        end)
+        Btn.MouseLeave:Connect(function()
+            TweenService:Create(Card, TweenInfo.new(0.15), { BackgroundColor3 = C.card }):Play()
+            TweenService:Create(CardStroke, TweenInfo.new(0.15), { Color = C.stroke, Transparency = 0.2 }):Play()
+        end)
+        Btn.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.Touch then
+                TweenService:Create(Card, TweenInfo.new(0.08), { BackgroundColor3 = C.cardActive }):Play()
+            end
+        end)
+        Btn.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.Touch then
+                TweenService:Create(Card, TweenInfo.new(0.2), { BackgroundColor3 = C.card }):Play()
+            end
+        end)
+
+        Btn.MouseButton1Click:Connect(function()
+            if loading or closed then return end
+            if expiresAt ~= math.huge and (expiresAt or 0) - nowTs() <= 0 then
+                closeAll()
+                return
+            end
+            loading = true
+            Name.Text = "▶ Launching " .. info.label .. "..."
+            Name.TextColor3 = C.neon
+            TweenService:Create(CardStroke, TweenInfo.new(0.2), { Color = C.neon, Transparency = 0 }):Play()
+            TweenService:Create(Card, TweenInfo.new(0.2), { BackgroundColor3 = C.cardActive }):Play()
+
+            task.wait(0.35)
+            closeAll()
+            task.wait(0.32)
+
+            local success, err = pcall(function()
+                loadstring(game:HttpGet(info.url))()
+            end)
+            if not success then
+                warn("[Misty Dany Hub] Failed to load " .. info.label .. ": " .. tostring(err))
+            end
+        end)
+
+        return Card
+    end
+
+    for i, info in ipairs(CONFIG.Versions) do
+        createCard(info, i)
+    end
+end
+
+-- ============================================================
+--  ЗАПУСК
+-- ============================================================
+local savedKey, savedTs = getSavedData()
+local isValid, reason = checkSavedKey(savedKey, savedTs)
+
+if isValid then
+    if reason == "vip" then
+        buildHubScreen(math.huge)
+    else
+        buildHubScreen(savedTs + KEY_DURATION)
+    end
+else
+    if reason == "expired" or reason == "revoked" or reason == "no saved key" then
+        clearSavedKey()
+    end
+    buildKeyScreen(function(newTs, isVip)
+        if isVip then
+            buildHubScreen(math.huge)
+        else
+            buildHubScreen(newTs + KEY_DURATION)
+        end
+    end)
 end
