@@ -38,17 +38,70 @@
   button:hover { background: #78dcff; transform: translateY(-1px); }
   button.copied { background: #3cf0a0; }
   .footer { color: #5078a8; font-size: 11px; margin-top: 24px; }
+  /* Стили для экрана блокировки */
+  .lock-screen { display: none; flex-direction: column; align-items: center; gap: 15px; }
+  .lock-icon { font-size: 40px; }
 </style>
 </head>
 <body>
 <div class="card">
   <h1>🔐 Misty Dany</h1>
-  <p class="sub">Твой ключ на сегодня (UTC)</p>
-  <div class="key" id="key">MISTY-RCOL-L6JZ-3XXN</div>
-  <button id="copy" onclick="copyKey()">📋 Скопировать</button>
+  
+  <!-- Экран с ключом -->
+  <div id="key-screen" style="display: none;">
+    <p class="sub">Твой ключ на сегодня (UTC)</p>
+    <div class="key" id="key">Загрузка...</div>
+    <button id="copy" onclick="copyKey()">📋 Скопировать</button>
+  </div>
+
+  <!-- Экран блокировки (если зашли напрямую) -->
+  <div id="lock-screen" class="lock-screen">
+    <div class="lock-icon">🛑</div>
+    <p class="sub" style="margin-bottom: 10px; color: #ff506e;">Доступ заблокирован!<br>Вы должны пройти через Lootlabs.</p>
+    <button onclick="window.location.href='https://lootdest.org/s?BSEkyrKI'" style="background: #ff506e; color: white;">Перейти к Lootlabs</button>
+  </div>
+
   <p class="footer">Ключ меняется автоматически. Не делись им с другими.</p>
 </div>
+
 <script>
+  // Список разрешенных сайтов, с которых можно переходить
+  const ALLOWED_REFERRERS = [
+    'lootlabs', 'loot-link', 'lootdest', 'loot-links'
+  ];
+
+  async function init() {
+    // Получаем URL, с которого пришел пользователь
+    const referrer = document.referrer.toLowerCase();
+    
+    // Проверяем, есть ли разрешенный сайт в referrer
+    const isFromLootlabs = ALLOWED_REFERRERS.some(domain => referrer.includes(domain));
+    
+    // Для отладки (если открываешь локально) - разрешаем доступ
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+    if (isFromLootlabs || isLocalhost) {
+      // Если пришел откуда надо - показываем ключ
+      document.getElementById('key-screen').style.display = 'block';
+      await loadKey();
+    } else {
+      // Если зашел напрямую - показываем экран блокировки
+      document.getElementById('lock-screen').style.display = 'flex';
+    }
+  }
+
+  async function loadKey() {
+    try {
+      // Загружаем ключ из скрытого файла raw.txt
+      const res = await fetch('raw.txt?t=' + Date.now());
+      if (!res.ok) throw new Error('Файл не найден');
+      const key = await res.text();
+      document.getElementById('key').innerText = key.trim();
+    } catch (e) {
+      document.getElementById('key').innerText = 'Ошибка загрузки';
+    }
+  }
+
   function copyKey() {
     const text = document.getElementById('key').innerText;
     navigator.clipboard.writeText(text).then(() => {
@@ -61,6 +114,9 @@
       }, 2000);
     });
   }
+
+  // Запускаем проверку при загрузке
+  init();
 </script>
 </body>
 </html>
