@@ -1,0 +1,53 @@
+name: Rotate Misty Key
+on:
+  schedule:
+    - cron: '5 0 * * *'        # 00:05 UTC
+  workflow_dispatch:           # для ручного запуска
+
+permissions:
+  contents: write
+concurrency:
+  group: rotate-key
+  cancel-in-progress: false
+
+jobs:
+  rotate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update key.html with next key
+        run: |
+          python3 <<'PY'
+          import re, time, pathlib
+
+          keys = [l.strip() for l in pathlib.Path("keys.txt").read_text(encoding="utf-8").splitlines() if l.strip()]
+          if not keys:
+              raise SystemExit("keys.txt is empty")
+
+          idx = int(time.time() // 86400) % len(keys)
+          current = keys[idx]
+          print(f"[rotate] day-index={idx} of {len(keys)} -> {current}")
+
+          p = pathlib.Path("key.html")
+          html = p.read_text(encoding="utf-8")
+          new_html, n = re.subn(r'id="key">[^<]*<', f'id="key">{current}<', html)
+          if n == 0:
+              raise SystemExit('Не найден <div class="key" id="key">…</div> в key.html')
+          if new_html == html:
+              print("[rotate] key.html already up-to-date, nothing to do")
+              raise SystemExit(0)
+          p.write_text(new_html, encoding="utf-8")
+          PY
+
+      - name: Commit & push if changed
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add key.html
+          if git diff --cached --quiet; then
+            echo "no change"
+          else
+            git commit -m "chore: rotate access key"
+            git push
+          fi
