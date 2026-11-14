@@ -38,9 +38,12 @@
   button:hover { background: #78dcff; transform: translateY(-1px); }
   button.copied { background: #3cf0a0; }
   .footer { color: #5078a8; font-size: 11px; margin-top: 24px; }
+  
   /* Стили для экрана блокировки */
   .lock-screen { display: none; flex-direction: column; align-items: center; gap: 15px; }
   .lock-icon { font-size: 40px; }
+  .btn-lootlabs { background: #ff506e; color: white; text-decoration: none; padding: 12px 24px; border-radius: 10px; font-weight: bold; font-size: 14px; display: inline-block; transition: .2s; }
+  .btn-lootlabs:hover { background: #ff2a4f; transform: translateY(-1px); }
 </style>
 </head>
 <body>
@@ -57,8 +60,11 @@
   <!-- Экран блокировки (если зашли напрямую) -->
   <div id="lock-screen" class="lock-screen">
     <div class="lock-icon">🛑</div>
-    <p class="sub" style="margin-bottom: 10px; color: #ff506e;">Доступ заблокирован!<br>Вы должны пройти через Lootlabs.</p>
-    <button onclick="window.location.href='https://lootdest.org/s?BSEkyrKI'" style="background: #ff506e; color: white;">Перейти к Lootlabs</button>
+    <p class="sub" style="margin-bottom: 10px; color: #ff506e; font-weight: bold;">
+      Доступ заблокирован!<br>
+      Вы должны пройти через Lootlabs.
+    </p>
+    <a href="https://lootdest.org/s?BSEkyrKI" class="btn-lootlabs">Пройти проверку Lootlabs</a>
   </div>
 
   <p class="footer">Ключ меняется автоматически. Не делись им с другими.</p>
@@ -69,6 +75,9 @@
   const ALLOWED_REFERRERS = [
     'lootlabs', 'loot-link', 'lootdest', 'loot-links'
   ];
+
+  // Твоя ссылка на Lootlabs
+  const LOOTLABS_URL = "https://lootdest.org/s?BSEkyrKI";
 
   async function init() {
     // Получаем URL, с которого пришел пользователь
@@ -87,6 +96,9 @@
     } else {
       // Если зашел напрямую - показываем экран блокировки
       document.getElementById('lock-screen').style.display = 'flex';
+      
+      // Делаем так, чтобы кнопка вела на правильную ссылку
+      document.querySelector('.btn-lootlabs').href = LOOTLABS_URL;
     }
   }
 
@@ -98,7 +110,7 @@
       const key = await res.text();
       document.getElementById('key').innerText = key.trim();
     } catch (e) {
-      document.getElementById('key').innerText = 'Ошибка загрузки';
+      document.getElementById('key').innerText = 'Ошибка загрузки ключа';
     }
   }
 
